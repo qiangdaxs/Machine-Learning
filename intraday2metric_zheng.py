@@ -1,48 +1,33 @@
-#!/usr/bin/env python2.7
-'''intraday2metric_zheng.py
-'''
-
-
-__author__ = 'fantasy <pkuqiuning@gmail.com>'
-__created__ = '2015-05-15 10:11:43 -0400'
-
-
-import zipline
-import matplotlib.pyplot as pyplot
-from collections import defaultdict
-
 import numpy as np
 import pandas as pd
+from datetime import timedelta
 import pytz
-from datetime import datetime, timedelta
-from zipline import TradingAlgorithm
-from zipline.api import order_target, record, symbol, history, add_history
-
-#: NOTICE HOW THIS IS OUTSIDE INITIALIZE, BECAUSE IT IS, WE CAN REDFINE IT EVERYTIME WE REDINE INITIALIZE
-aapl_weights = .50
-spy_weights = .50
-
 
 def initialize(context):
-    #set_symbol_lookup_date('2015-04-01')
+    set_symbol_lookup_date('2015-04-01')
     
     context.stocks = symbols('FOXA','ATVI','ADBE','AKAM','ALXN','ALTR','AMGN','ADI','AMAT','ADSK','ADP','AVGO','BIDU','BBBY','BIIB','BRCM','CHRW','CA','CTRX','CELG','CERN','CHTR','CHKP','CSCO','CTXS','CTSH','COST','DTV','DISH','DLTR','EBAY','EQIX','EXPE','EXPD','ESRX','FFIV','FAST','FISV','GRMN','GILD','HSIC','ILMN','INTC','INTU','ISRG','KLAC','GMCR','KRFT','LMCK','LMCA','LLTC','MAR','MAT','MXIM','MU','MDLZ','MNST','MYL','NTAP','NFLX','NVDA','NXPI','ORLY','PCAR','PAYX','QCOM','REGN','ROST','SNDK','SBAC','STX','SIAL','SIRI','SPLS','SBUX','SRCL','SYMC','TSLA','TXN','PCLN','TSCO','TRIP','VRSK','VRTX','VIAB','VIP','VOD','WDC','WFM','WYNN','XLNX')
     
-    #set_benchmark(symbol('SPY'))
+    set_benchmark(symbol('SPY'))
     
     
-    #set_commission(commission.PerShare(cost=0.014, min_trade_cost=1.4))
+    set_commission(commission.PerShare(cost=0.014, min_trade_cost=1.4))
     
    
-    #set_slippage(slippage.FixedSlippage(spread=0))
-    #fetch_csv("https://dl.dropboxusercontent.com/u/70792051/Accern%20Backtest/NASDAQ100_MarketNeutral.csv",
-              #pre_func = change_dates,
-              #date_column ='start_date',
-              #date_format ='%m/%-d/%Y %H:%M' )
+    set_slippage(slippage.FixedSlippage(spread=0))
+    fetch_csv("https://dl.dropboxusercontent.com/u/70792051/Accern%20Backtest/NASDAQ100_MarketNeutral.csv",
+              pre_func = change_dates,
+              date_column ='start_date',
+              date_format ='%m/%-d/%Y %H:%M' )
         
     
-    schedule_function(long_bulls_short_bears, date_rules.every_day(), time_rules.market_open())
-    schedule_function(close_all_positions, date_rules.every_day(), time_rules.market_close(minutes=5))
+    schedule_function(long_bulls_short_bears,
+                      date_rules.every_day(),
+                      time_rules.market_open())
+
+    schedule_function(close_all_positions,
+                      date_rules.every_day(),
+                      time_rules.market_close(minutes=5))
     
     
     
@@ -74,11 +59,11 @@ def long_bulls_short_bears(context, data):
         if ('article_sentiment' and 'event_impact_score_entity_1' and 'overall_source_rank') in data[stock]:
             today = get_datetime()
             if data[stock]['enter_date'].month == today.month and data[stock]['enter_date'].year == today.year and data[stock]['enter_date'].day == today.day:
-                if (data[stock]['article_sentiment'] > context.upper_bound):
+                if (data[stock]['article_sentiment'] > context.upper_bound) and (data[stock]['overall_source_rank'] > context.upper_bound_a):
                     bulls.append(stock)
                  
                 
-                elif (data[stock]['article_sentiment'] < context.lower_bound):
+                elif (data[stock]['article_sentiment'] < context.lower_bound) and (data[stock]['overall_source_rank'] > context.lower_bound_a):
                     bears.append(stock)
                
 
@@ -103,9 +88,3 @@ def close_all_positions(context, data):
     
 def handle_data(context, data):
     pass
-    
-
-if __name__ == "__main__":
-    main()
-
-
