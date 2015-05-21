@@ -24,11 +24,11 @@ start = '2014-1-4'
 end = '2015-2-19'
 #end = '2015-2-18'
 #stocks = ['DLTR', 'GOOGL', 'SPY']
-stocks = pd.read_csv('stocklist.csv', header=None)
+stocks = pd.read_csv('data/stocklist.csv', header=None)
 
 
 #ind_data = pd.read_csv('DLTR.csv', index_col = 'harvested_at', parse_dates=True)
-ind_data = pd.read_csv('NASDAQ100_MarketNeutral.csv', index_col = 'start_date', parse_dates=True)
+ind_data = pd.read_csv('data/NASDAQ100_MarketNeutral.csv', index_col = 'start_date', parse_dates=True)
 start = datetime.strptime(start, '%Y-%m-%d')
 end = datetime.strptime(end, '%Y-%m-%d')
 data = load_bars_from_yahoo(stocks=stocks, start=start, end=end)

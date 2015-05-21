@@ -17,15 +17,15 @@ import matplotlib.pyplot as pyplot
 import pytz
 from datetime import datetime
 from zipline.utils.factory import load_bars_from_yahoo
-import logging
 import functools
+import logging
+logging.basicConfig(level=logging.DEBUG)
 
 
 start = '2012-8-25'
 end = '2015-2-19'
 #stocks = ['DLTR', 'GOOGL', 'SPY']
 stocks = ['DLTR']
-logging.basicConfig(level=logging.DEBUG)
 
 
 #ind_data = pd.read_csv('data/NASDAQ100_MarketNeutral.csv', index_col = 'start_date', parse_dates=True)
