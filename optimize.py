@@ -45,7 +45,7 @@ def main():
     global START
     global STOCKS
     MINUTE_TEST = False
-    START = '2014-1-4'
+    START = '2012-9-14'
     END = '2015-2-19'
     #END = '2015-2-18'
     #STOCKS = ['DLTR', 'GOOGL', 'SPY']
@@ -61,7 +61,11 @@ def main():
     # load data
     #ind_data = pd.read_csv('DLTR.csv', index_col = 'harvested_at', parse_dates=True)
     logging.debug('load indicator data')
+    
     ind_data = pd.read_csv('data/NASDAQ100_MarketNeutral.csv', index_col = 'start_date', parse_dates=True)
+    #import pickle
+    #ind_data = pickle.load(open('data/NASDAQ100_MarketNeutral.pickle', 'rb'))
+    #import interact; interact.run(local=dict(locals(), **globals()))
     logging.debug('load stock prices')
     if MINUTE_TEST:
         data = load_bars(STOCKS, START, END)
