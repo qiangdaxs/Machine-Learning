@@ -15,7 +15,7 @@ import pandas as pd
 import matplotlib.pyplot as pyplot
 import pytz
 from datetime import datetime, timedelta
-#from zipline.utils.factory import load_bars_from_yahoo
+from zipline.utils.factory import load_bars_from_yahoo
 import functools
 import logging
 
@@ -41,6 +41,9 @@ def local_market_data(bm_symbol='GSPC'):
     return gspc, tbill
 zipline.data.loader.load_market_data = local_market_data
 reload(zipline.finance.trading)
+
+
+MINUTE_TEST = False
 
 
 def load_bars_from_file(stock, start=None, end=None):
@@ -78,11 +81,14 @@ def initialize_template(context, parameters, stocks, start):
     context.parameters = parameters
 
 
+if MINUTE_TEST:
+    NEXT_DELTA = timedelta(minutes=1)
+else:
+    NEXT_DELTA = timedelta(days=1)
+
 def handle_data(context, data):
     now = get_datetime()
-    ################# daily / minute switch ###################################
-    now_next = now + timedelta(minutes=1)
-    ###########################################################################
+    now_next = now + NEXT_DELTA
     #now_minute = get_datetime().strftime('%F %R')
     nlong = 0
     nshort = 0
@@ -97,8 +103,8 @@ def handle_data(context, data):
             stock = v['symbol']
 
         if stock in context.stocks:
-            #print v['article_sentiment']
             # select stocks in the context
+            #print i, stock, v['article_sentiment']
 
             if (v['article_sentiment'] > context.parameters['article_sentiment_upper']):
                 price = data[stock].price
@@ -174,11 +180,13 @@ def main():
     START = '2012-8-26'
     START = '2012-9-14'
     END = '2015-2-19'
-    END = '2012-09-19'
-    STOCKS = ['DLTR', 'GOOGL']
+    #END = '2012-09-19'
+    #STOCKS = ['DLTR', 'GOOGL']
     #STOCKS = ['DLTR']
     #STOCKS = ['AAPL', 'DLTR']
-    #STOCKS = pd.read_csv('data/sp500.csv', header=None).iloc[:, 0][1:4]
+    #STOCKS = list(pd.read_csv('data/sp500.csv', header=None).iloc[:, 0])
+    STOCKS = open('data/sp500.csv').read().splitlines()
+    STOCKS = list(pd.read_csv('data/stocklist.csv', header=None).iloc[:, 0])
 
     parameters = dict(
         article_sentiment_upper = 0.53,
@@ -191,8 +199,10 @@ def main():
     ind_data = pd.read_csv('data/NASDAQ100_MarketNeutral.csv', index_col='start_date', parse_dates=True)
     #START = datetime.strptime(START, '%Y-%m-%d')
     #END = datetime.strptime(END, '%Y-%m-%d')
-    #data = load_bars_from_yahoo(stocks=STOCKS, start=START, end=END)
-    data = load_bars(stocks=STOCKS, start=START, end=END)
+    if MINUTE_TEST:
+        data = load_bars(stocks=STOCKS, start=START, end=END)
+    else:
+        data = load_bars_from_yahoo(stocks=STOCKS, start=START, end=END)
 
     # Run algorithm
     algo_obj = TradingAlgorithm(initialize=initialize, handle_data=handle_data)

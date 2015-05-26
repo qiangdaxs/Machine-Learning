@@ -26,7 +26,6 @@ end = '2015-2-19'
 stocks = open('stocklist.csv').read().splitlines()
 
 
-
 ######################################################
 #ind_data = pd.read_csv('DLTR.csv', index_col = 'harvested_at', parse_dates=True)
 ind_data = local_csv('NASDAQ100_MarketNeutral.csv', date_column= 'start_date', use_date_column_as_index=True)

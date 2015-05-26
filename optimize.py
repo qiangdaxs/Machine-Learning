@@ -44,13 +44,14 @@ def result2sharpe(result):
 def main():
     global START
     global STOCKS
+    MINUTE_TEST = False
     START = '2014-1-4'
     END = '2015-2-19'
     #END = '2015-2-18'
     #STOCKS = ['DLTR', 'GOOGL', 'SPY']
     logging.debug('load stock list')
-    #STOCKS = pd.read_csv('data/stocklist.csv', header=None).iloc[:, 0]
-    STOCKS = pd.read_csv('data/sp500.csv', header=None).iloc[:, 0][1:4]
+    #STOCKS = list(pd.read_csv('data/stocklist.csv', header=None).iloc[:, 0])
+    STOCKS = list(pd.read_csv('data/sp500.csv', header=None).iloc[:, 0][1:4])
     #print STOCKS
     #uppers = np.linspace(0, 1, 11)
     #lowers = -uppers
@@ -62,7 +63,10 @@ def main():
     logging.debug('load indicator data')
     ind_data = pd.read_csv('data/NASDAQ100_MarketNeutral.csv', index_col = 'start_date', parse_dates=True)
     logging.debug('load stock prices')
-    data = load_bars(STOCKS, START, END)
+    if MINUTE_TEST:
+        data = load_bars(STOCKS, START, END)
+    else:
+        data = load_bars_from_yahoo(stocks=STOCKS, start=START, end=END)
     backtest.ind_data = ind_data
 
     # Create a dictionary to hold all the results of our algorithm run
