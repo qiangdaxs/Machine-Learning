@@ -12,7 +12,7 @@ import pandas as pd
 
 
 def main():
-    START = '2012-9-14'
+    START = '2012-8-1'
     END = '2015-2-19'
     stocks = open('data/sp500.csv').read().splitlines()
 
@@ -24,6 +24,7 @@ def main():
 
     prices_df = pd.DataFrame(prices)
     prices_df.to_csv('sp500_close.csv')
+    #prices_df.to_hdf('data/sp500_close.h5')
 
 
 if __name__ == "__main__":
