@@ -115,7 +115,7 @@ def handle_data(context, data):
                 price = data[stock].price
                 logging.debug('[{}] trigger short {}@{} as={}'.format(i, stock, price, v['article_sentiment']))
                 #logging.debug('[{}] @{} as={} '.format(now_minute, stock, v['article_sentiment']))
-                order_target_percent(stock, 0.)
+                order_target_percent(stock, -1.)
                 nshort += -1
 
     context.last_ind_time = now_next
