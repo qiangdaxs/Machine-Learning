@@ -51,9 +51,9 @@ def load_trade(signal_file=SIGNAL_FILE, key='/signal'):
 
 
 def do_transaction(t, symbol, amount, prices):
-    '''return the transaction for given order, None for no transaction
+    '''timestamp, str, float, dataframe -> transaction
+    return the transaction for given order, None for no transaction
 
-    timestamp, str, float, dataframe -> transaction
     '''
     t0 = t.replace(second=0)
     #tt = t0 if t0 in self._trading_time_index else None
@@ -63,7 +63,7 @@ def do_transaction(t, symbol, amount, prices):
     try:
         price = prices.loc[t0, symbol]
         if np.isnan(price):
-            print (t0, symbol, amount, price)
+            return None
         #return (tt, symbol, amount, price)
         return (t0, symbol, amount, price)
     except KeyError:
@@ -89,36 +89,39 @@ def get_trans(trades, price_minute):
 
 
 # EOD positions
-def get_stockpos(trans):
-    '''given excuted transactions, produce EOD stock positions'''
-    ##TODO
-    trans_eod = trans.groupby('symbol').resample('D', how={'amount': sum}).amount
-    d_stockpos = trans_eod.unstack('symbol').dropna(how='all')
-    d_stockpos[d_stockpos.isnull()] = 0
-    stockpos = d_stockpos.cumsum()
-    return stockpos
+def get_trans_eod(trans):
+    '''given excuted transactions, produce EOD transactions'''
+    trans.eval('cash = -amount * price')
+    trans_eod = trans.groupby('symbol').resample('D', how={'amount': sum, 'cash': sum})
+    return trans_eod
 
 
-def get_cashpos(trans):
-    pass
+def get_pos_eod(trans_eod):
+    '''given EOD transactions, produce EOD stock and cash positions'''
+    d_pos = trans_eod.unstack('symbol').dropna(how='all')
+    d_pos[d_pos.isnull()] = 0
+    pos = d_pos.cumsum()
+    stockpos = pos.amount
+    cashpos = pos.cash.sum(axis=1)
+    return stockpos, cashpos
 
 
 def get_stock_value(stockpos, price_daily):
-    ##TODO
-    matching_prices = price_daily.loc[stockpos.index]
+    '''given stock positions, produce EOD stock values'''
+    matching_prices = price_daily.loc[stockpos.index, stockpos.columns]
     return stockpos * matching_prices
 
 
 def get_stock_total_values(stock_values):
-    ##TODO
+    '''given EOD stock values, produce EOD total stock account values'''
     #trades['tot'] = trades.amount * trades.price
-    pass
+    return stock_values.sum(axis=1)
 
 
 def get_values(stock_total_values, cashpos):
-    ##TODO
-    pass
-
+    '''pd.Series, pd.Series -> pd.Series
+    given EOD total stock values and cash account values'''
+    return stock_total_values + cashpos
 
 
 def main():
@@ -135,16 +138,17 @@ def main():
     logging.info('begin calculation...')
     trans = get_trans(trades, price_minute)
     # EOD positions
-    stockpos = get_stockpos(trans)
-    cashpos = get_cashpos(trans)
+    #stockpos = get_stockpos(trans)
+    trans_eod = get_trans_eod(trans)
+    stockpos, cashpos = get_pos_eod(trans_eod)
     stock_values = get_stock_value(stockpos, price_daily)
     stock_total_values = get_stock_total_values(stock_values)
     values = get_values(stock_total_values, cashpos)
     logging.info('calculation finished')
-    #values.plot()
-    #plt.show()
+    values.plot()
+    plt.show()
 
 
 if __name__ == "__main__":
-    test()
-    #main()
+    #test()
+    main()
