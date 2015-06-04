@@ -1,4 +1,5 @@
 *.swp
+*.h5
 *#
 *.csv
 x*
@@ -6,3 +7,5 @@ Untitle*
 *.txt
 data
 *~
+*.pyc
+.*
