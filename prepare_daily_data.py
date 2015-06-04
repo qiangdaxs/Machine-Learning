@@ -12,12 +12,12 @@ import pandas as pd
 
 
 def main():
-    START = '2012-9-14'
+    START = '2012-8-25'
     END = '2015-2-19'
     H5FILE = 'data/sp500.h5'
     stocks = open('data/sp500.csv').read().splitlines()
 
-    prices_df = pd.read_csv('data/sp500_close.csv.gz', index_col='Date_Time', parse_dates=True)
+    prices_df = pd.read_csv('sp500_close.csv.gz', index_col='Date_Time', parse_dates=True)
     #prices = {}
     #for i, stock in enumerate(stocks):
         #df = load_bars_from_file(stock, start=START, end=END)

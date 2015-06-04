@@ -12,7 +12,7 @@ import pandas as pd
 
 
 def main():
-    START = '2012-8-1'
+    START = '2012-8-15'
     END = '2015-2-19'
     stocks = open('data/sp500.csv').read().splitlines()
 
