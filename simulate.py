@@ -11,25 +11,13 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import logging
 import numpy as np
+import argparse
 
 
 logging.basicConfig(level=logging.DEBUG)
-SP500_FILE = 'data/sp500.h5'
-SIGNAL_FILE = 'data/sp500-smaller-signal.h5'
-
-
-def test():
-    import doctest
-    doctest.testmod()
-    #sig = pd.read_hdf('data/sp500-smaller-signal.h5', '/signal')['2012-9':]
-    #sample_trades = sig.iloc[:, 0:3]
-    #sample_trades.columns = ['symbol', 'amount', 'price']
-    #sample_trades.dropna(inplace=True)
-    #sample_trades['tot'] = sample_trades.amount * sample_trades.price
-    ##sample_trades = pd.read_csv(trade_csv, index_col=0, parse_dates=True)
-    #tm = sample_trades.groupby('symbol').resample('D', how='sum')
-    ##print sample_trades.price * sample_trades.amount
-    #tm.unstack('symbol')
+PRICES_FILE = 'data/sp500.h5'
+TRADE_FILE = 'data/trade.txt'
+RESULTS_FILE = 'data/results.txt'
 
 
 def load_minute_price(filename, key='/minute/close'):
@@ -40,10 +28,10 @@ def load_daily_price(filename, key='/daily/close'):
     return pd.read_hdf(filename, key)
 
 
-def load_trade(signal_file=SIGNAL_FILE, key='/signal'):
+def load_trade(trade_file=TRADE_FILE):
     ##TODO: load real trades
     ### Simulated trades
-    sig = pd.read_hdf(signal_file, key)
+    sig = pd.read_hdf(trade_file, 'signal')
     sample_trades = sig.iloc[:, 0:2]
     
     sample_trades.columns = ['symbol', 'amount']
@@ -72,10 +60,15 @@ def do_transaction(t, symbol, amount, prices):
 
 def get_trans(trades, price_minute):
     '''process trade orders and produce transactions'''
+    #TODO make this faster
     transactions = []
     #trading_time_index = price_minute.index
+    import sys
 
-    for t, v in trades.iterrows():
+    for i, row in enumerate(trades.iterrows()):
+        if i % 10000 == 0:
+            print >>sys.stderr, i, '\r',
+        t, v = row
         # t: time
         # v: [symbol, amount]
         # query trading price
@@ -125,20 +118,32 @@ def get_values(stock_total_values, cashpos):
 
 
 def main():
+    argp = argparse.ArgumentParser()
+    #argp.add_argument('-i', '--investment', type=float, default=INVEST, help='initial investment')
+    #argp.add_argument('-c', '--cost', type=float, default=COMMITION_RATE, help='commition cost')
+    argp.add_argument('-pf', '--price-file', default=PRICES_FILE, help='price file in hdf5 format')
+    argp.add_argument('-tf', '--trade-file', default=TRADE_FILE, help='trade file')
+    #argp.add_argument('-rf', '--result-file', default=RESULTS_FILE, help='result file')
+
+    args = argp.parse_args()
+
+
     logging.info('loading...')
-    logging.debug('load minute data')
-    price_minute = load_minute_price(SP500_FILE)
+    logging.debug('load minute data from {}'.format(args.price_file))
+    price_minute = load_minute_price(args.price_file)
+
     logging.debug('load daily data')
-    price_daily = load_daily_price(SP500_FILE)
-    logging.debug('load all the trades')
-    ##TODO: use all data here
-    #trades = load_trade()
-    trades = load_trade().iloc[:50000]
+    price_daily = load_daily_price(args.price_file)
+
+    logging.debug('load trades from {}'.format(args.trade_file))
+    trades = load_trade(args.trade_file)
+    #trades = load_trade().iloc[:50000]
+
     logging.info('loading finished')
+
     logging.info('begin calculation...')
     trans = get_trans(trades, price_minute)
     # EOD positions
-    #stockpos = get_stockpos(trans)
     trans_eod = get_trans_eod(trans)
     stockpos, cashpos = get_pos_eod(trans_eod)
     stock_values = get_stock_value(stockpos, price_daily)
@@ -150,5 +155,19 @@ def main():
 
 
 if __name__ == "__main__":
-    #test()
     main()
+
+
+#def test():
+    #import doctest
+    #doctest.testmod()
+    ##sig = pd.read_hdf('data/sp500-smaller-signal.h5', '/signal')['2012-9':]
+    ##sample_trades = sig.iloc[:, 0:3]
+    ##sample_trades.columns = ['symbol', 'amount', 'price']
+    ##sample_trades.dropna(inplace=True)
+    ##sample_trades['tot'] = sample_trades.amount * sample_trades.price
+    ###sample_trades = pd.read_csv(trade_csv, index_col=0, parse_dates=True)
+    ##tm = sample_trades.groupby('symbol').resample('D', how='sum')
+    ###print sample_trades.price * sample_trades.amount
+    ##tm.unstack('symbol')
+
