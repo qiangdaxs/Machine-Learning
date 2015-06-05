@@ -17,7 +17,7 @@ import sys
 
 logging.basicConfig(level=logging.DEBUG)
 PRICES_FILE = 'data/sp500.h5'
-TRADE_FILE = 'data/trade.txt'
+ORDER_FILE = 'data/trade.txt'
 RESULTS_FILE = 'data/results.txt'
 COMMITION_RATE = 0.001
 
@@ -30,10 +30,16 @@ def load_daily_price(filename, key='/daily/close'):
     return pd.read_hdf(filename, key)
 
 
-def load_trade(trade_file=TRADE_FILE):
-    '''load trade data from csv file or hdf5 file based on the file ext'''
+def load_order(order_file=ORDER_FILE):
+    '''load trade data from csv'''
+    orders = pd.read_csv(order_file, parse_dates=True, index_col=0)
+    #orders.columns = ['symbol', 'amount']
+    return orders
+
+
+def load_trades(trade_file):
+    '''load trade file from csv'''
     trades = pd.read_csv(trade_file, parse_dates=True, index_col=0)
-    #trades.columns = ['symbol', 'amount']
     return trades
 
 
@@ -57,16 +63,15 @@ def do_transaction(t, symbol, amount, prices):
         return None
 
 
-def get_trans(trades, price_minute, rate):
-    '''process trade orders and produce transactions'''
+def get_trades(orders, price_minute):
+    '''given trade orders, query price data to produce trades'''
     #TODO make this faster
     transactions = []
     #trading_time_index = price_minute.index
 
-    logging.debug('processing transactions...')
-    for i, row in enumerate(trades.iterrows()):
+    for i, row in enumerate(orders.iterrows()):
         if i % 10000 == 0:
-            print >>sys.stderr, i, '\r',
+            print >>sys.stderr, 'trading...', i, '\r',
         t, v = row
         # t: time
         # v: [symbol, amount]
@@ -75,11 +80,16 @@ def get_trans(trades, price_minute, rate):
         if transaction:
             #print transaction[0]
             transactions.append(transaction)
-    trans = pd.DataFrame(transactions, columns=['T', 'symbol', 'amount', 'price'])
+    trades = pd.DataFrame(transactions, columns=['T', 'symbol', 'amount', 'price'])
+    trades.set_index('T', inplace=True)
+    return trades
+
+
+def get_trans(trades, rate, inplace=True):
+    '''given trades and commission rate, produce transaction'''
+    trans = trades if inplace else trades[:]
     trans.eval('cash = -amount * price')
     trans['commission'] = trans.cash.abs() * rate
-    trans.set_index('T', inplace=True)
-    logging.debug('finished processing transactions')
     return trans
 
 
@@ -120,36 +130,41 @@ def get_values(stock_total_values, cashpos, costs):
 
 
 def main():
+    # parse command line arguments
     argp = argparse.ArgumentParser()
     #argp.add_argument('-i', '--investment', type=float, default=INVEST, help='initial investment')
     argp.add_argument('-c', '--commission', type=float, default=COMMITION_RATE, help='commition rate')
     argp.add_argument('-pf', '--price-file', default=PRICES_FILE, help='price file in hdf5 format')
-    argp.add_argument('-tf', '--trade-file', default=TRADE_FILE, help='trade file')
+    argp.add_argument('-of', '--order-file', default=ORDER_FILE, help='order file')
+    argp.add_argument('-tf', '--trade-file', default=None, help='trade file, if provided, skipping query price')
     #argp.add_argument('-rf', '--result-file', default=RESULTS_FILE, help='result file')
-
+    argp.add_argument('-s', '--start-day', default=None, help='simulation start day')
+    argp.add_argument('-e', '--end-day', default=None, help='simulation end day')
     args = argp.parse_args()
     #args = argp.parse_args('')
 
-
-    logging.info('loading...')
-    logging.debug('load minute data from {}'.format(args.price_file))
-    price_minute = load_minute_price(args.price_file)
-
     logging.debug('load daily data')
     price_daily = load_daily_price(args.price_file)
+ 
+    if not args.trade_file:
+        logging.debug('load minute data from {}'.format(args.price_file))
+        price_minute = load_minute_price(args.price_file)
 
-    logging.debug('load trades from {}'.format(args.trade_file))
-    trades = load_trade(args.trade_file)
-    #trades = load_trade(args.trade_file).iloc[100000:150000]
+        logging.debug('load orders from {}'.format(args.order_file))
+        orders = load_order(args.order_file)
+        #orders = load_order(args.order_file).iloc[100000:150000]
 
-    logging.info('loading finished')
+        trades = get_trades(orders, price_minute)
+    else:
+        trades = load_trades(args.trade_file)
 
-    logging.info('begin calculation...')
-    trans = get_trans(trades, price_minute, args.commission)
+    trans = get_trans(trades, args.commission)
 
     # EOD processes begin
+    logging.info('begin calculation...')
     trans_eod = get_trans_eod(trans)
     stockpos, cashpos, costs = get_pos_eod(trans_eod)
+    #TODO guess trading time from data
     stock_values = get_stock_value(stockpos, price_daily)
     stock_total_values = get_stock_total_values(stock_values)
     values = get_values(stock_total_values, cashpos, costs)
