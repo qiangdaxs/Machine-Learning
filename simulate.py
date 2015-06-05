@@ -127,8 +127,8 @@ def main():
     argp.add_argument('-tf', '--trade-file', default=TRADE_FILE, help='trade file')
     #argp.add_argument('-rf', '--result-file', default=RESULTS_FILE, help='result file')
 
-    #args = argp.parse_args()
-    args = argp.parse_args('')
+    args = argp.parse_args()
+    #args = argp.parse_args('')
 
 
     logging.info('loading...')
