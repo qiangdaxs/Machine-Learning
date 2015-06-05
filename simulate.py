@@ -12,12 +12,14 @@ import matplotlib.pyplot as plt
 import logging
 import numpy as np
 import argparse
+import sys
 
 
 logging.basicConfig(level=logging.DEBUG)
 PRICES_FILE = 'data/sp500.h5'
 TRADE_FILE = 'data/trade.txt'
 RESULTS_FILE = 'data/results.txt'
+COMMITION_RATE = 0.001
 
 
 def load_minute_price(filename, key='/minute/close'):
@@ -29,13 +31,10 @@ def load_daily_price(filename, key='/daily/close'):
 
 
 def load_trade(trade_file=TRADE_FILE):
-    ##TODO: load real trades
-    ### Simulated trades
-    sig = pd.read_hdf(trade_file, 'signal')
-    sample_trades = sig.iloc[:, 0:2]
-    
-    sample_trades.columns = ['symbol', 'amount']
-    return sample_trades
+    '''load trade data from csv file or hdf5 file based on the file ext'''
+    trades = pd.read_csv(trade_file, parse_dates=True, index_col=0)
+    #trades.columns = ['symbol', 'amount']
+    return trades
 
 
 def do_transaction(t, symbol, amount, prices):
@@ -58,13 +57,13 @@ def do_transaction(t, symbol, amount, prices):
         return None
 
 
-def get_trans(trades, price_minute):
+def get_trans(trades, price_minute, rate):
     '''process trade orders and produce transactions'''
     #TODO make this faster
     transactions = []
     #trading_time_index = price_minute.index
-    import sys
 
+    logging.debug('processing transactions...')
     for i, row in enumerate(trades.iterrows()):
         if i % 10000 == 0:
             print >>sys.stderr, i, '\r',
@@ -77,15 +76,17 @@ def get_trans(trades, price_minute):
             #print transaction[0]
             transactions.append(transaction)
     trans = pd.DataFrame(transactions, columns=['T', 'symbol', 'amount', 'price'])
+    trans.eval('cash = -amount * price')
+    trans['commission'] = trans.cash.abs() * rate
     trans.set_index('T', inplace=True)
+    logging.debug('finished processing transactions')
     return trans
 
 
 # EOD positions
 def get_trans_eod(trans):
     '''given excuted transactions, produce EOD transactions'''
-    trans.eval('cash = -amount * price')
-    trans_eod = trans.groupby('symbol').resample('D', how={'amount': sum, 'cash': sum})
+    trans_eod = trans.groupby('symbol').resample('D', how={'amount': sum, 'cash': sum, 'commission': sum})
     return trans_eod
 
 
@@ -96,7 +97,8 @@ def get_pos_eod(trans_eod):
     pos = d_pos.cumsum()
     stockpos = pos.amount
     cashpos = pos.cash.sum(axis=1)
-    return stockpos, cashpos
+    costs = pos.commission.sum(axis=1)
+    return stockpos, cashpos, costs
 
 
 def get_stock_value(stockpos, price_daily):
@@ -111,21 +113,22 @@ def get_stock_total_values(stock_values):
     return stock_values.sum(axis=1)
 
 
-def get_values(stock_total_values, cashpos):
-    '''pd.Series, pd.Series -> pd.Series
+def get_values(stock_total_values, cashpos, costs):
+    '''pd.Series, pd.Series, pd.Series -> pd.Series
     given EOD total stock values and cash account values'''
-    return stock_total_values + cashpos
+    return stock_total_values + cashpos + costs
 
 
 def main():
     argp = argparse.ArgumentParser()
     #argp.add_argument('-i', '--investment', type=float, default=INVEST, help='initial investment')
-    #argp.add_argument('-c', '--cost', type=float, default=COMMITION_RATE, help='commition cost')
+    argp.add_argument('-c', '--commission', type=float, default=COMMITION_RATE, help='commition rate')
     argp.add_argument('-pf', '--price-file', default=PRICES_FILE, help='price file in hdf5 format')
     argp.add_argument('-tf', '--trade-file', default=TRADE_FILE, help='trade file')
     #argp.add_argument('-rf', '--result-file', default=RESULTS_FILE, help='result file')
 
-    args = argp.parse_args()
+    #args = argp.parse_args()
+    args = argp.parse_args('')
 
 
     logging.info('loading...')
@@ -137,18 +140,19 @@ def main():
 
     logging.debug('load trades from {}'.format(args.trade_file))
     trades = load_trade(args.trade_file)
-    #trades = load_trade().iloc[:50000]
+    #trades = load_trade(args.trade_file).iloc[100000:150000]
 
     logging.info('loading finished')
 
     logging.info('begin calculation...')
-    trans = get_trans(trades, price_minute)
-    # EOD positions
+    trans = get_trans(trades, price_minute, args.commission)
+
+    # EOD processes begin
     trans_eod = get_trans_eod(trans)
-    stockpos, cashpos = get_pos_eod(trans_eod)
+    stockpos, cashpos, costs = get_pos_eod(trans_eod)
     stock_values = get_stock_value(stockpos, price_daily)
     stock_total_values = get_stock_total_values(stock_values)
-    values = get_values(stock_total_values, cashpos)
+    values = get_values(stock_total_values, cashpos, costs)
     logging.info('calculation finished')
     values.plot()
     plt.show()
