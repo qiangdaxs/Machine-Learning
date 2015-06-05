@@ -131,17 +131,18 @@ def get_values(stock_total_values, cashpos, costs):
 
 def main():
     # parse command line arguments
-    argp = argparse.ArgumentParser()
+    argp = argparse.ArgumentParser(
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
     #argp.add_argument('-i', '--investment', type=float, default=INVEST, help='initial investment')
     argp.add_argument('-c', '--commission', type=float, default=COMMITION_RATE, help='commition rate')
     argp.add_argument('-pf', '--price-file', default=PRICES_FILE, help='price file in hdf5 format')
     argp.add_argument('-of', '--order-file', default=ORDER_FILE, help='order file')
     argp.add_argument('-tf', '--trade-file', default=None, help='trade file, if provided, skipping query price')
-    #argp.add_argument('-rf', '--result-file', default=RESULTS_FILE, help='result file')
     argp.add_argument('-s', '--start-day', default=None, help='simulation start day')
     argp.add_argument('-e', '--end-day', default=None, help='simulation end day')
+    #argp.add_argument('-rf', '--result-file', default=RESULTS_FILE, help='result file')
     args = argp.parse_args()
-    #args = argp.parse_args('')
 
     logging.debug('load daily data')
     price_daily = load_daily_price(args.price_file)
