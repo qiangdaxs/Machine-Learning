@@ -30,21 +30,24 @@ def load_daily_price(filename, key='/daily/close'):
     return pd.read_hdf(filename, key)
 
 
-def load_order(order_file=ORDER_FILE):
+def load_order(order_file=ORDER_FILE, timezone='UTC'):
     '''load trade data from csv'''
     orders = pd.read_csv(order_file, parse_dates=True, index_col=0)
+    orders.index = orders.index.tz_localize(timezone)
     #orders.columns = ['symbol', 'amount']
     return orders
 
 
-def load_trades(trade_file):
+def load_trades(trade_file, timezone='UTC'):
     '''load trade file from csv'''
     trades = pd.read_csv(trade_file, parse_dates=True, index_col=0)
+    trades.index = trades.index.tz_localize(timezone)
     return trades
 
 
 def do_transaction(t, symbol, amount, prices):
     '''timestamp, str, float, dataframe -> transaction
+
     return the transaction for given order, None for no transaction
 
     '''
@@ -54,7 +57,7 @@ def do_transaction(t, symbol, amount, prices):
     #if t0:
         #price = self.prices.loc[tt, symbol]
     try:
-        price = prices.loc[t0, symbol]
+        price = prices.at[t0, symbol]
         if np.isnan(price):
             return None
         #return (tt, symbol, amount, price)
@@ -65,7 +68,6 @@ def do_transaction(t, symbol, amount, prices):
 
 def get_trades(orders, price_minute):
     '''given trade orders, query price data to produce trades'''
-    #TODO make this faster
     transactions = []
     #trading_time_index = price_minute.index
 
@@ -82,6 +84,37 @@ def get_trades(orders, price_minute):
             transactions.append(transaction)
     trades = pd.DataFrame(transactions, columns=['T', 'symbol', 'amount', 'price'])
     trades.set_index('T', inplace=True)
+    return trades
+
+
+def get_trades_fast(orders, price_minute):
+    '''given trade orders, query price data to produce trades'''
+    #trading_time_index = price_minute.index
+    assert price_minute.index.is_monotonic
+    assert price_minute.columns.is_monotonic
+
+    # retrieve matrix form of orders and price_minute
+    # set second to be zero for order time list
+    order_timelist = [t.replace(second=0) for t in orders.index.to_pydatetime()]
+    order_times = pd.to_datetime(order_timelist).values
+    #((orders.index.values.astype(int) // 60e9)*60e9).astype('datetime64[ns]')
+    order_symbols = orders.symbol.values
+    price_times = price_minute.index.values
+    price_symbols = price_minute.columns.values
+
+    # only process times and symbols in price_minute data
+    tradable_index = np.in1d(order_symbols, price_symbols) & np.in1d(order_times, price_times)
+    # find prices of tradable orders
+    rows = price_times.searchsorted(order_times[tradable_index])
+    cols = price_symbols.searchsorted(order_symbols[tradable_index])
+    prices = price_minute.values[rows, cols]
+    # identify nan from the resulting prices
+    notnan_index = ~ np.isnan(prices)
+    # construct dataframe trade
+    trades = orders[tradable_index][notnan_index]
+    trades['price'] = prices[notnan_index]
+    trades.index.name = 'T'
+
     return trades
 
 
@@ -132,6 +165,7 @@ def get_values(stock_total_values, cashpos, costs):
 def main():
     # parse command line arguments
     argp = argparse.ArgumentParser(
+        description='Market simulator, provide order file or trade file, simulate market performance.',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     #argp.add_argument('-i', '--investment', type=float, default=INVEST, help='initial investment')
@@ -139,8 +173,8 @@ def main():
     argp.add_argument('-pf', '--price-file', default=PRICES_FILE, help='price file in hdf5 format')
     argp.add_argument('-of', '--order-file', default=ORDER_FILE, help='order file')
     argp.add_argument('-tf', '--trade-file', default=None, help='trade file, if provided, skipping query price')
-    argp.add_argument('-s', '--start-day', default=None, help='simulation start day')
-    argp.add_argument('-e', '--end-day', default=None, help='simulation end day')
+    #argp.add_argument('-s', '--start-day', default=None, help='simulation start day')
+    #argp.add_argument('-e', '--end-day', default=None, help='simulation end day')
     #argp.add_argument('-rf', '--result-file', default=RESULTS_FILE, help='result file')
     args = argp.parse_args()
 
@@ -155,7 +189,8 @@ def main():
         orders = load_order(args.order_file)
         #orders = load_order(args.order_file).iloc[100000:150000]
 
-        trades = get_trades(orders, price_minute)
+        #trades = get_trades(orders, price_minute)
+        trades = get_trades_fast(orders, price_minute)
     else:
         trades = load_trades(args.trade_file)
 
@@ -165,7 +200,6 @@ def main():
     logging.info('begin calculation...')
     trans_eod = get_trans_eod(trans)
     stockpos, cashpos, costs = get_pos_eod(trans_eod)
-    #TODO guess trading time from data
     stock_values = get_stock_value(stockpos, price_daily)
     stock_total_values = get_stock_total_values(stock_values)
     values = get_values(stock_total_values, cashpos, costs)
