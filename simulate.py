@@ -17,7 +17,7 @@ import sys
 
 logging.basicConfig(level=logging.DEBUG)
 PRICES_FILE = 'data/sp500.h5'
-ORDER_FILE = 'data/trade.txt'
+ORDER_FILE = 'data/orders.txt'
 RESULTS_FILE = 'data/results.txt'
 COMMITION_RATE = 0.001
 
@@ -33,7 +33,7 @@ def load_daily_price(filename, key='/daily/close'):
 def load_order(order_file=ORDER_FILE, timezone='UTC'):
     '''load trade data from csv'''
     orders = pd.read_csv(order_file, parse_dates=True, index_col=0)
-    orders.index = orders.index.tz_localize(timezone)
+    orders.index = orders.index.tz_localize(timezone).tz_convert('UTC')
     #orders.columns = ['symbol', 'amount']
     return orders
 
@@ -41,7 +41,7 @@ def load_order(order_file=ORDER_FILE, timezone='UTC'):
 def load_trades(trade_file, timezone='UTC'):
     '''load trade file from csv'''
     trades = pd.read_csv(trade_file, parse_dates=True, index_col=0)
-    trades.index = trades.index.tz_localize(timezone)
+    trades.index = trades.index.tz_localize(timezone).tz_convert('UTC')
     return trades
 
 
@@ -159,7 +159,7 @@ def get_stock_total_values(stock_values):
 def get_values(stock_total_values, cashpos, costs):
     '''pd.Series, pd.Series, pd.Series -> pd.Series
     given EOD total stock values and cash account values'''
-    return stock_total_values + cashpos + costs
+    return stock_total_values + cashpos - costs
 
 
 def main():
@@ -173,6 +173,8 @@ def main():
     argp.add_argument('-pf', '--price-file', default=PRICES_FILE, help='price file in hdf5 format')
     argp.add_argument('-of', '--order-file', default=ORDER_FILE, help='order file')
     argp.add_argument('-tf', '--trade-file', default=None, help='trade file, if provided, skipping query price')
+    argp.add_argument('-tz', '--time-zone', default='UTC', help='input file time zone, ex. US/Eastern')
+    argp.add_argument('-v', '--verbose', default=False, help='output detailed information')
     #argp.add_argument('-s', '--start-day', default=None, help='simulation start day')
     #argp.add_argument('-e', '--end-day', default=None, help='simulation end day')
     #argp.add_argument('-rf', '--result-file', default=RESULTS_FILE, help='result file')
@@ -186,24 +188,34 @@ def main():
         price_minute = load_minute_price(args.price_file)
 
         logging.debug('load orders from {}'.format(args.order_file))
-        orders = load_order(args.order_file)
+        orders = load_order(args.order_file, timezone=args.time_zone)
+        logging.debug('read {} orders'.format(len(orders)))
+        if args.verbose:
+            print orders
         #orders = load_order(args.order_file).iloc[100000:150000]
 
         #trades = get_trades(orders, price_minute)
         trades = get_trades_fast(orders, price_minute)
+        logging.debug('get {} trades'.format(len(trades)))
+        if args.verbose:
+            print trades
     else:
-        trades = load_trades(args.trade_file)
+        trades = load_trades(args.trade_file, timezone=args.time_zone)
+        logging.debug('read {} trades'.format(len(trades)))
 
     trans = get_trans(trades, args.commission)
 
     # EOD processes begin
-    logging.info('begin calculation...')
+    logging.info('begin EOD calculation...')
     trans_eod = get_trans_eod(trans)
     stockpos, cashpos, costs = get_pos_eod(trans_eod)
+    logging.debug('get {} EOD positions'.format(len(stockpos)))
+    if args.verbose:
+        print stockpos
     stock_values = get_stock_value(stockpos, price_daily)
     stock_total_values = get_stock_total_values(stock_values)
     values = get_values(stock_total_values, cashpos, costs)
-    logging.info('calculation finished')
+    logging.info('calculation EOD finished')
     values.plot()
     plt.show()
 
