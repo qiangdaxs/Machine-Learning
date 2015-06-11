@@ -7,19 +7,25 @@ __author__ = 'fantasy <pkuqiuning@gmail.com>'
 __created__ = '2015-05-27 12:57:17 -0400'
 
 
+import os
+import sys
+import logging
+import argparse
+import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import logging
-import numpy as np
-import argparse
-import sys
 
 
 logging.basicConfig(level=logging.DEBUG)
+
+
+INVEST = 1e6
 PRICES_FILE = 'data/sp500.h5'
 ORDER_FILE = 'data/orders.txt'
-RESULTS_FILE = 'data/results.txt'
+RESULTS_FILE = 'data/simulate_results.txt'
+FIGURE_FILE = 'data/simulate.png'
 COMMITION_RATE = 0.001
+LOG_DIR = 'log'
 
 
 def load_minute_price(filename, key='/minute/close'):
@@ -104,6 +110,7 @@ def get_trades_fast(orders, price_minute):
 
     # only process times and symbols in price_minute data
     tradable_index = np.in1d(order_symbols, price_symbols) & np.in1d(order_times, price_times)
+
     # find prices of tradable orders
     rows = price_times.searchsorted(order_times[tradable_index])
     cols = price_symbols.searchsorted(order_symbols[tradable_index])
@@ -121,25 +128,25 @@ def get_trades_fast(orders, price_minute):
 def get_trans(trades, rate, inplace=True):
     '''given trades and commission rate, produce transaction'''
     trans = trades if inplace else trades[:]
-    trans.eval('cash = -amount * price')
-    trans['commission'] = trans.cash.abs() * rate
+    trans.eval('cashvalue = amount * price')
+    trans['commission'] = trans.cashvalue.abs() * rate
     return trans
 
 
 # EOD positions
 def get_trans_eod(trans):
     '''given excuted transactions, produce EOD transactions'''
-    trans_eod = trans.groupby('symbol').resample('D', how={'amount': sum, 'cash': sum, 'commission': sum})
+    trans_eod = trans.groupby('symbol').resample('D', how={'amount': sum, 'cashvalue': sum, 'commission': sum})
     return trans_eod
 
 
-def get_pos_eod(trans_eod):
-    '''given EOD transactions, produce EOD stock and cash positions'''
+def get_pos_eod(trans_eod, init=INVEST):
+    '''given EOD transactions, produce EOD stock and cash positions with total commissions'''
     d_pos = trans_eod.unstack('symbol').dropna(how='all')
     d_pos[d_pos.isnull()] = 0
     pos = d_pos.cumsum()
     stockpos = pos.amount
-    cashpos = pos.cash.sum(axis=1)
+    cashpos = init - (pos.cashvalue + pos.commission).sum(axis=1)
     costs = pos.commission.sum(axis=1)
     return stockpos, cashpos, costs
 
@@ -156,10 +163,10 @@ def get_stock_total_values(stock_values):
     return stock_values.sum(axis=1)
 
 
-def get_values(stock_total_values, cashpos, costs):
+def get_values(stock_total_values, cashpos):
     '''pd.Series, pd.Series, pd.Series -> pd.Series
     given EOD total stock values and cash account values'''
-    return stock_total_values + cashpos - costs
+    return stock_total_values + cashpos
 
 
 def main():
@@ -168,18 +175,30 @@ def main():
         description='Market simulator, provide order file or trade file, simulate market performance.',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
-    #argp.add_argument('-i', '--investment', type=float, default=INVEST, help='initial investment')
+    argp.add_argument('-i', '--investment', type=float, default=INVEST, help='initial investment')
     argp.add_argument('-c', '--commission', type=float, default=COMMITION_RATE, help='commition rate')
     argp.add_argument('-pf', '--price-file', default=PRICES_FILE, help='price file in hdf5 format')
     argp.add_argument('-of', '--order-file', default=ORDER_FILE, help='order file')
+    argp.add_argument('-rf', '--result-file', default=RESULTS_FILE, help='result file')
+    argp.add_argument('-ff', '--figure-file', default=FIGURE_FILE, help='figure file')
     argp.add_argument('-tf', '--trade-file', default=None, help='trade file, if provided, skipping query price')
     argp.add_argument('-tz', '--time-zone', default='UTC', help='input file time zone, ex. US/Eastern')
-    argp.add_argument('-v', '--verbose', default=False, help='output detailed information')
     #argp.add_argument('-s', '--start-day', default=None, help='simulation start day')
     #argp.add_argument('-e', '--end-day', default=None, help='simulation end day')
-    #argp.add_argument('-rf', '--result-file', default=RESULTS_FILE, help='result file')
+
+    argp.add_argument('-nos', '--no-show', action='store_true', help='do not show figure')
+    argp.add_argument('-log', '--log', action='store_true', help='output detailed information')
+    argp.add_argument('-it', '--interactive', action='store_true', help='enter interactive mode after running')
     args = argp.parse_args()
 
+
+    if args.log:
+        # prepare log directory
+        if not os.path.exists(LOG_DIR):
+            os.makedirs(LOG_DIR)
+
+
+    logging.info('loading data...')
     logging.debug('load daily data')
     price_daily = load_daily_price(args.price_file)
  
@@ -190,15 +209,15 @@ def main():
         logging.debug('load orders from {}'.format(args.order_file))
         orders = load_order(args.order_file, timezone=args.time_zone)
         logging.debug('read {} orders'.format(len(orders)))
-        if args.verbose:
-            print orders
+        if args.log:
+            orders.to_csv(LOG_DIR + '/orders.log')
         #orders = load_order(args.order_file).iloc[100000:150000]
 
         #trades = get_trades(orders, price_minute)
         trades = get_trades_fast(orders, price_minute)
         logging.debug('get {} trades'.format(len(trades)))
-        if args.verbose:
-            print trades
+        if args.log:
+            trades.to_csv(LOG_DIR + 'trades.log')
     else:
         trades = load_trades(args.trade_file, timezone=args.time_zone)
         logging.debug('read {} trades'.format(len(trades)))
@@ -210,14 +229,28 @@ def main():
     trans_eod = get_trans_eod(trans)
     stockpos, cashpos, costs = get_pos_eod(trans_eod)
     logging.debug('get {} EOD positions'.format(len(stockpos)))
-    if args.verbose:
-        print stockpos
+    if args.log:
+        stockpos.to_csv(LOG_DIR + 'stockpos.log')
+        cashpos.to_csv(LOG_DIR + 'cashpos.log')
+        costs.to_csv(LOG_DIR + 'costs.log')
     stock_values = get_stock_value(stockpos, price_daily)
     stock_total_values = get_stock_total_values(stock_values)
-    values = get_values(stock_total_values, cashpos, costs)
+    values = get_values(stock_total_values, cashpos)
     logging.info('calculation EOD finished')
+    if args.interactive:
+        import interact
+        interact.run(local=dict(locals(), **globals()))
+
+
+    logging.info('saving results...')
+    logging.debug('save result to {}'.format(args.result_file))
+    values.to_csv(args.result_file)
     values.plot()
-    plt.show()
+    logging.debug('save figure to {}'.format(args.figure_file))
+    plt.savefig(args.figure_file)
+    if not args.no_show:
+        logging.debug('showing figures')
+        plt.show()
 
 
 if __name__ == "__main__":
