@@ -12,10 +12,11 @@ import pandas as pd
 
 
 def main():
-    START = '2012-1-1'
-    END = '2015-5-1'
+    #START = '2012-1-1'
+    #END = '2015-5-1'
     H5FILE = 'data/sp500.h5'
     stocks = open('data/sp500.txt').read().splitlines()
+    pd.DataFrame(stocks).to_hdf(H5FILE, '/symbols', if_exists='replace')
 
     prices_df = pd.read_csv('sp500_close.csv.gz', index_col='Date_Time', parse_dates=True)
     #prices = {}
@@ -27,7 +28,6 @@ def main():
     #prices_df = pd.DataFrame(prices)
     #prices_df.to_csv('sp500_close.csv')
 
-    pd.DataFrame(stocks).to_hdf(H5FILE, '/symbols', if_exists='replace')
     prices_df.to_hdf(H5FILE, '/minute/close', if_exists='replace')
     prices_daily = prices_df.resample('D', how='last').dropna(how='all')
     prices_daily.to_hdf(H5FILE, '/daily/close', if_exists='replace')
