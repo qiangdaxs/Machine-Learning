@@ -12,9 +12,9 @@ import pandas as pd
 
 
 def main():
-    START = '2012-8-15'
-    END = '2015-2-19'
-    stocks = open('data/sp500.csv').read().splitlines()
+    START = '2012-8-10'
+    END = '2015-2-10'
+    stocks = open('data/sp500.txt').read().splitlines()
 
     prices = {}
     for i, stock in enumerate(stocks):
@@ -24,7 +24,7 @@ def main():
 
     prices_df = pd.DataFrame(prices)
     prices_df.to_csv('sp500_close.csv')
-    #prices_df.to_hdf('data/sp500_close.h5')
+    prices_df.to_hdf('data/sp500_close.h5')
 
 
 if __name__ == "__main__":

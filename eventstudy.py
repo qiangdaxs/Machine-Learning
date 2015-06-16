@@ -57,5 +57,3 @@ def event_study(events, price_minute, n=5000):
 
 if __name__ == "__main__":
     main()
-
-

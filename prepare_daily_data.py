@@ -12,8 +12,8 @@ import pandas as pd
 
 
 def main():
-    START = '2012-8-25'
-    END = '2015-2-19'
+    START = '2012-8-10'
+    END = '2015-2-10'
     H5FILE = 'data/sp500.h5'
     stocks = open('data/sp500.csv').read().splitlines()
 
