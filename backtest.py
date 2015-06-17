@@ -46,12 +46,13 @@ reload(zipline.finance.trading)
 MINUTE_TEST = False
 
 
-def load_bars_from_file(stock, start=None, end=None):
+def load_bars_from_file(stock, start=None, end=None, path=None):
     '''load pricing data from single file
     str, str, str -> pd.DataFrame
     
     '''
-    path = 'data/1M_SP500/{}.csv'.format(stock)
+    if not path:
+        path = 'data/1M_SP500/{}.csv'.format(stock)
     logging.debug('load stock from {}'.format(path))
     prices = pd.read_csv(path, parse_dates=[['Date', 'Time']], index_col='Date_Time')
     prices.index = prices.index.tz_localize('US/Eastern').tz_convert('UTC')
