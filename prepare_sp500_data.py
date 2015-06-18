@@ -27,6 +27,7 @@ def main():
     if os.path.exists(SP500_ALL_FILE):
         prices_df = pd.read_hdf(SP500_ALL_FILE, 'minute/close')
         prices_df = prices_df[(prices_df.index <= END) & (prices_df.index >= START)]
+        stocks = pd.read_hdf(SP500_ALL_FILE, 'symbols')
     else:
         # load stock list
         stocks = open('data/sp500.txt').read().splitlines()
