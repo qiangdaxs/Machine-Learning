@@ -16,9 +16,10 @@ def main():
     #END = '2015-5-1'
     H5FILE = 'data/sp500.h5'
     stocks = open('data/sp500.txt').read().splitlines()
+    print 'load {} stocks'.format(len(stocks))
     pd.DataFrame(stocks).to_hdf(H5FILE, '/symbols', if_exists='replace')
 
-    prices_df = pd.read_csv('sp500_close.csv.gz', index_col='Date_Time', parse_dates=True)
+    prices_df = pd.read_csv('sp500_close.csv', index_col='Date_Time', parse_dates=True)
     #prices = {}
     #for i, stock in enumerate(stocks):
         #df = load_bars_from_file(stock, start=START, end=END)
