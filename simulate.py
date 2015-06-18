@@ -274,7 +274,7 @@ def main():
         trades = get_trades_fast(orders, price_minute)
         logging.debug('get {} trades'.format(len(trades)))
         if args.log:
-            trades.to_csv(LOG_DIR + 'trades.log')
+            trades.to_csv(LOG_DIR + '/trades.log')
     else:
         trades = load_trades(args.trade_file, timezone=args.time_zone)
         logging.debug('read {} trades'.format(len(trades)))
@@ -283,7 +283,7 @@ def main():
         logging.info('calculation running on weight based mode')
         trades = market_simulate_weight_based(trades, price_minute, args.investment, args.commission)
         if args.log:
-            trades.to_csv(LOG_DIR + 'trades_wt.log')
+            trades.to_csv(LOG_DIR + '/trades_wt.log')
     trans = get_trans(trades, args.commission)
     trans_eod = get_trans_eod(trans)
     logging.info('begin EOD calculation...')
@@ -291,9 +291,9 @@ def main():
     logging.debug('get {} EOD positions'.format(len(stockpos)))
 
     if args.log:
-        stockpos.to_csv(LOG_DIR + 'stockpos.log')
-        cashpos.to_csv(LOG_DIR + 'cashpos.log')
-        costs.to_csv(LOG_DIR + 'costs.log')
+        stockpos.to_csv(LOG_DIR + '/stockpos.log')
+        cashpos.to_csv(LOG_DIR + '/cashpos.log')
+        costs.to_csv(LOG_DIR + '/costs.log')
 
     stock_values = get_stock_value(stockpos, price_daily)
     stock_total_values = get_stock_total_values(stock_values)
