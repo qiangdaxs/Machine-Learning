@@ -13,12 +13,12 @@ import pandas as pd
 import os
 
 
-ORIGION_FILE = 'data/sp500-ori.h5'
+ORIGION_FILE = 'data/sp500-all-close.h5'
 H5FILE = 'data/sp500.h5'
 CSVFILE = 'data/sp500-close.csv'
 DAILY_CSVFILE = 'data/sp500-close-daily.csv'
 RETURN_FILE = 'data/sp500_r.h5'
-START = '2010-1-1'
+START = '2012-1-1'
 END = '2015-5-1'
 
 
