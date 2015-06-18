@@ -19,6 +19,7 @@ import logging
 logging.basicConfig(level=logging.DEBUG)
 BOUND = -0.2
 PRICES_FILE = 'data/sp500.h5'
+RETURNS_FILE = 'data/sp500_r.h5'
 EVENT_FILE = 'data/event.csv'
 RESULTS_FILE = 'data/eventstudy.txt'
 
@@ -34,7 +35,8 @@ def main():
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     argp.add_argument('-pf', '--price-file', default=PRICES_FILE, help='price file in hdf5 format')
-    argp.add_argument('-if', '--input-file', default=EVENT_FILE, help='event file, two columns, [T, symbol]')
+    argp.add_argument('-rf', '--return-file', default=EVENT_FILE, help='return file')
+    argp.add_argument('-if', '--input-file', default=RETURNS_FILE, help='event file, two columns, [T, symbol]')
     #argp.add_argument('-s', '--start-day', default=None, help='simulation start day')
     #argp.add_argument('-e', '--end-day', default=None, help='simulation end day')
     argp.add_argument('-of', '--out-file', default=RESULTS_FILE, help='result file')
@@ -43,13 +45,14 @@ def main():
     # schedule calculation
     # load price file
     price_minute = simulate.load_minute_price(simulate.PRICES_FILE)
+    return_data = pd.read_hdf(args.return_file, 'minute/return')
     price_daily = simulate.load_daily_price(simulate.PRICES_FILE)
 
     # load events
     events = pd.read_csv()
 
     # excute calculation
-    study = event_study(events, price_minute)
+    study = event_study(events, price_minute, return_data, market_return_data, beta_data)
 
     # store results
     np.savetxt('study_as{}.txt'.format(BOUND), study)

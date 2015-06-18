@@ -18,10 +18,10 @@ ORDER_FILE = 'data/gensig-orders.txt'
 
 # Parameter is dict
 # interp. the parameter for signal generating
-PARA = dict(
-    as_upper = 0.8,
-    as_lower = -0.8,
-)
+PARA = {
+        'as':  0.8,
+        'is':  0.7,
+        }
 
 
 # Signal is pd.DataFrame(time x [metrices])
@@ -47,12 +47,17 @@ def main():
     #lo = PARA['as_lower']
     #hi = PARA['as_upper']
     signal = pd.read_hdf(SIGNAL_FILE, SIGNAL_FILE_KEY)
+    orders = sample_strategy(signal, PARA)
 
     # run strategy and generate buy/sell signal
-    orders = make_orders(1.0, 'article_sentiment > 0.94 and event_impact_score_entity_1 > 0.7', signal)
-    orders2 = make_orders(-1.0, 'article_sentiment < -0.55 and event_impact_score_entity_1 > 0.7', signal)
-    orders = pd.concat([orders, orders2]).sort()
     orders.to_csv('data/orders.csv')
+
+
+def sample_strategy(signal, para=PARA, amount=1.0):
+    orders = make_orders(amount, 'article_sentiment > {0[as]} and event_impact_score_entity_1 > {0[is]}'.format(para), signal)
+    orders2 = make_orders(-amount, 'article_sentiment < {} and event_impact_score_entity_1 > {}'.format(-para['as'], para['is']), signal)
+    orders = pd.concat([orders, orders2]).sort()
+    return orders
 
 
 def make_orders(amount, eval_string, signal):

@@ -141,14 +141,13 @@ def get_trades_fast(orders, price_minute):
     return trades
 
 
-def market_simulate_weight_based(trades_wt, price_minute, investment, commission_rate):
+def make_trade_amount_based(trades_wt, price_minute, investment, commission_rate):
     '''trades_wt, price_daily, investment, commission -> trades
 
-    excute market trades, produce transactions
+    translate weight based trades into amount based trades
 
     Precondition:
     trades should be time-ordered
-
     
     '''
 
@@ -248,18 +247,17 @@ def main():
     argp.add_argument('-debug', action='store_true', help='enter interactive mode after running')
     args = argp.parse_args()
 
-
     if args.log:
         # prepare log directory
         if not os.path.exists(LOG_DIR):
             os.makedirs(LOG_DIR)
-
 
     logging.info('loading data...')
     logging.debug('load daily data')
     price_daily = load_daily_price(args.price_file)
  
     if not args.trade_file:
+        # provided order file, need to load minute data to determine trade price
         logging.debug('load minute data from {}'.format(args.price_file))
         price_minute = load_minute_price(args.price_file)
 
@@ -276,36 +274,30 @@ def main():
         if args.log:
             trades.to_csv(LOG_DIR + '/trades.log')
     else:
+        # provided trade file, just load it
         trades = load_trades(args.trade_file, timezone=args.time_zone)
         logging.debug('read {} trades'.format(len(trades)))
 
     if args.weight_based:
+        # order is weight based, translate it to amount based
         logging.info('calculation running on weight based mode')
-        trades = market_simulate_weight_based(trades, price_minute, args.investment, args.commission)
+        trades = make_trade_amount_based(trades, price_minute, args.investment, args.commission)
         if args.log:
             trades.to_csv(LOG_DIR + '/trades_wt.log')
-    trans = get_trans(trades, args.commission)
-    trans_eod = get_trans_eod(trans)
-    logging.info('begin EOD calculation...')
-    stockpos, cashpos, costs = get_pos_eod_daily(trans_eod, price_daily, args.investment)
-    logging.debug('get {} EOD positions'.format(len(stockpos)))
 
-    if args.log:
-        stockpos.to_csv(LOG_DIR + '/stockpos.log')
-        cashpos.to_csv(LOG_DIR + '/cashpos.log')
-        costs.to_csv(LOG_DIR + '/costs.log')
+    # start simulation
+    sim = MarketSimulator(args.investment, args.commission, args.log)
+    values = sim.do_trade(trades, price_daily)
 
-    stock_values = get_stock_value(stockpos, price_daily)
-    stock_total_values = get_stock_total_values(stock_values)
-    values = get_values(stock_total_values, cashpos)
-    logging.info('calculation EOD finished')
+    # bring up the console? so we can interact with the results
     if args.debug:
         import interact
         interact.run(local=dict(locals(), **globals()))
 
-
+    # save and plot results
     logging.info('saving results...')
     logging.debug('save result to {}'.format(args.result_file))
+
     values.to_csv(args.result_file)
     values.plot()
     logging.debug('save figure to {}'.format(args.figure_file))
@@ -313,6 +305,39 @@ def main():
     if not args.no_show:
         logging.debug('showing figures')
         plt.show()
+
+
+class MarketSimulator:
+    '''Market Simulator Class, will run trades for you'''
+
+    def __init__(self, investment=INVEST, commission=COMMITION_RATE, log=False):
+        '''float, float, bool -> None'''
+        self.investment = investment
+        self.commission = commission
+        self.log = log
+
+    def do_trade(args, trades, price_daily):
+        '''Trades, Prices -> Values
+        
+        Do trades and return eod of day (EOD) portfolio values
+
+        '''
+        trans = get_trans(trades, args.commission)
+        trans_eod = get_trans_eod(trans)
+        logging.info('begin EOD calculation...')
+        stockpos, cashpos, costs = get_pos_eod_daily(trans_eod, price_daily, args.investment)
+        logging.debug('get {} EOD positions'.format(len(stockpos)))
+
+        if args.log:
+            stockpos.to_csv(LOG_DIR + '/stockpos.log')
+            cashpos.to_csv(LOG_DIR + '/cashpos.log')
+            costs.to_csv(LOG_DIR + '/costs.log')
+
+        stock_values = get_stock_value(stockpos, price_daily)
+        stock_total_values = get_stock_total_values(stock_values)
+        values = get_values(stock_total_values, cashpos)
+        logging.info('calculation EOD finished')
+        return values
 
 
 if __name__ == "__main__":
