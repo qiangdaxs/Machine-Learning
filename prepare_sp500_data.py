@@ -13,7 +13,7 @@ import pandas as pd
 import os
 
 
-ORIGION_FILE = 'data/sp500-ori.h5'
+SP500_ALL_FILE = 'data/sp500-all-close.h5'
 H5FILE = 'data/sp500.h5'
 CSVFILE = 'data/sp500-close.csv'
 DAILY_CSVFILE = 'data/sp500-close-daily.csv'
@@ -24,8 +24,8 @@ END = '2015-5-1'
 
 def main():
     # load close prices of stocks
-    if os.path.exists(ORIGION_FILE):
-        prices_df = pd.read_hdf(ORIGION_FILE, 'minute/close')
+    if os.path.exists(SP500_ALL_FILE):
+        prices_df = pd.read_hdf(SP500_ALL_FILE, 'minute/close')
         prices_df = prices_df[(prices_df.index <= END) & (prices_df.index >= START)]
     else:
         # load stock list
