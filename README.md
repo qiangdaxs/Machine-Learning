@@ -1,2 +1,0 @@
-# accern-backtest
-# backtest
